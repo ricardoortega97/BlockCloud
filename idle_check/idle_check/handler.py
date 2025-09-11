@@ -7,9 +7,10 @@ from utlis.eventBridge_utils import EventBridgeManager
 INSTANCE_ID = os.environ['INSTANCE_ID']
 RULE_NAME = os.environ["EVENTBRIDGE_RULE_NAME"]
 DISCORD_WEBHOOK_URL = os.environ['DISCORD_WEBHOOK_URL']
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
 
-ec2 = EC2Manager(INSTANCE_ID)
-eb = EventBridgeManager(RULE_NAME)
+ec2 = EC2Manager(INSTANCE_ID, AWS_REGION)
+eb = EventBridgeManager(RULE_NAME, AWS_REGION)
 
 def lambda_handler(event, context):
     print("Hello Lambda!")
