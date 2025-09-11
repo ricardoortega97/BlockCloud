@@ -4,7 +4,7 @@ class EventBridgeManager:
     """
     Class to disable an EventBridge rule when the EC2 instance is stopped in the idle check process.
     """
-    def __init__(self, rule_name: str, region_name: str = 'us-east-1'):
+    def __init__(self, rule_name: str, region_name: str):
         self.rule_name = rule_name
         self.event = boto3.client('events', region_name=region_name)
 

@@ -9,7 +9,7 @@ class EC2Manager:
     :param ssm_client: A Boto3 SSM client.
     :param instance_id: The ID of the EC2 instance to manage.
     """
-    def __init__(self, instance_id: str, region_name: str = 'us-east-1'):
+    def __init__(self, instance_id: str, region_name: str):
         self.instance_id = instance_id
         self.ec2_client = boto3.client('ec2', region_name=region_name)
         self.ssm_client = boto3.client('ssm', region_name=region_name)
