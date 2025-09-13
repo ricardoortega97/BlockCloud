@@ -9,22 +9,29 @@ The main purpose is to reduce unnecessary server runtime by automatically stoppi
 ### How It Works
 
 - A Discord slash command triggers an API request that starts the EventBridge rule and the EC2 instance hosting the Minecraft server.
+
 - The AWS Lambda function *idle_check* runs on a schedule to monitor server activity.
+
 - If no players have been online for 30 minutes, the Lambda function issues commands to save progress and stop the EC2 instance.
+
 - This ensures the server only runs when needed, saving costs while letting any Discord member start or stop it without using a local machine.
 
 ### Deployment Instructions
 
 1. **Prepare the Environment**
     - Ensure you have Python 3.10 or higher installed (compatible with AWS Lambda).
+
     - Install all required packages listed in `requirements.txt` using:
+
       ```
       pip install -r requirements.txt -t ./package
       ```
     - Move your source code into the `package` directory.
 
 2. **Create the Deployment Package**
+
     - Zip the contents of the `package` directory (not the directory itself):
+
       ```
       cd package
       zip -r ../lambda_function.zip .
@@ -44,10 +51,15 @@ The main purpose is to reduce unnecessary server runtime by automatically stoppi
 
 4. **AWS EventBridge Requirements**
     - Rule Type: Sheduled
+
       - For this project, EventBridge rule is triggered by a Discord slash command.
+
     - Target: AWS Lambda function that manages the EC2 server start/stop.
+
     - Permisions: 
-      -EventBridge needs permission to invoke your Lambda Function.
+    
+      - EventBridge needs permission to invoke your Lambda Function.
+
       - Ensure the Lambda execution role allows `lambda:InvokeFunction`.
     - Rele Name: Set a descriptive name, eg., `start-mc-server-rule`.
     - [**Important**] Region: Must match the region of your Lambda and EC2 instance, else will need to create a VPC rule to configure. 
@@ -67,7 +79,9 @@ The main purpose is to reduce unnecessary server runtime by automatically stoppi
 ### Notes
 
 - Do not include unnecessary files (such as tests or documentation) in the deployment zip.
+
 - If your code uses native dependencies, ensure they are compiled for the Lambda environment (Amazon Linux).
+
 - Might be outdated since there was some mixup between the code here and in the Lambda...
 
 ### License
