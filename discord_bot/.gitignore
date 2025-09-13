@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+/node_modules/
 
 # Virtual environment
 venv/
@@ -11,6 +12,7 @@ ENV/
 .pipenv/
 pip-wheel-metadata/
 /node_modules/
+
 
 # Distribution / packaging
 build/
@@ -56,3 +58,6 @@ coverage.xml
 # Discord bot token/config
 config.json
 secrets.json
+
+# Python 
+idle_check/
