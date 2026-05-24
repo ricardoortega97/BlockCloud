@@ -13,20 +13,17 @@ ec2 = EC2Manager(INSTANCE_ID, AWS_REGION)
 eb = EventBridgeManager(RULE_NAME, AWS_REGION)
 
 def lambda_handler(event, context):
-    print("Hello Lambda!")
-    check_players_handler(event, context)
+    check_players_handler()
 
-def check_players_handler(event, context):
-
+def check_players_handler():
     mc_host = ec2.get_public_ip()
     player_count = get_player_count(mc_host)
     if player_count == 0:
-        print("No players online since 30 mins, Sending  save/stop commands and stopping instance")
+        print("No players online, saving world and stopping instance.")
         ec2.send_mc_command("save-all")
         ec2.send_mc_command("stop")
-
         eb.disable_rule()
-        notify_discord(f"Server is stopping due to inactivity. No players online.")
+        notify_discord("Server is stopping due to inactivity. No players online.")
         ec2.stop()
     else:
         print(f"Players online: {player_count}, not stopping instance.")
@@ -34,16 +31,12 @@ def check_players_handler(event, context):
         'statusCode': 200,
         'body': f'Player count checked: {player_count}'
     }
+
 def notify_discord(message: str):
-    """
-    Sends a notification message to a Discord channel via webhook.
-    :param message: The message to send.
-    """
-    data = {
-        "content": message
-    }
+    """Sends a notification message to a Discord channel via webhook."""
+    data = {"content": message}
     response = requests.post(DISCORD_WEBHOOK_URL, json=data)
     if response.status_code != 204:
-        print(f"Failed to send message to Discord: {response.status_code}, {response.text}")
+        print(f"Failed to send Discord message: {response.status_code}, {response.text}")
     else:
-        print("Notification sent to Discord successfully.")
+        print("Discord notification sent.")

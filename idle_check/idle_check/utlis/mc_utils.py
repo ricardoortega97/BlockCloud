@@ -1,8 +1,8 @@
-from mcstatus import BedrockServer
+from mcstatus import JavaServer
 
 def get_player_count(host: str) -> int:
     try:
-        server = BedrockServer(host, 25565)
+        server = JavaServer(host, 25565)
         status = server.status()
         return status.players.online
     except Exception as e:

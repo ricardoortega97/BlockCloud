@@ -1,211 +1,141 @@
 ## BlockCloud
 
-**BlockCould** is a project that integrates a Discord Bot and an AWS Serverless function to showcase my full-stack + cloud engineering skills. 
+**BlockCloud** is a project that integrates a Discord Bot and an AWS Serverless function to showcase my full-stack + cloud engineering skills.
 
-My goal was to use a Discord bot to start our Minecraft Server that will be on a EC2 instance on behalf instead of waiting for the friend that had the server on their computer and port forwarding their modem. 
+My goal was to use a Discord bot to start a Minecraft Server hosted on an EC2 instance — instead of relying on a friend to host locally and port-forward their modem.
 
-I wanted to also strengthen my understanding of AWS cloud services while also considering the cost optimization strategies (because we are broke...).
+I also wanted to strengthen my understanding of AWS cloud services while applying cost optimization strategies (because we are broke...).
 
 ### Project Overview
 
-- **Discord Bot** - Automates AWS tasks (start/stop EC2 instance, checks the status)
-  - **Docker + Raspberry Pi** - The Discord Bot containerized with Docker and is deployed on a Raspberry Pi for lightweight, always-on hosting. 
+- **Discord Bot** — Automates AWS tasks (start/stop EC2 instance, checks the status)
+  - **Docker + Raspberry Pi** — The Discord Bot is containerized with Docker and deployed on a Raspberry Pi for lightweight, always-on hosting.
 
-- **Idle Check** - A scheduled service using AWS Lambda + EventBridge 
+- **Idle Check** — A scheduled service using AWS Lambda + EventBridge Scheduler that automatically stops the server after 30 minutes of inactivity.
+
+- **IaC** — All AWS infrastructure is provisioned with Terraform.
 
 ## Architecture Diagram
 
 ![BlockCloud architecture](./images/mcServer.webp)
 
-## Documentation for discord_bot
+---
 
-### Purpose
+## Components
 
-This project runs as a backend service that integrates Discord slash commands with AWS infrastructure for managing the MC server hosted on the EC2 instance. 
+### `discord_bot/`
 
-It provides a simple interface for our Discord server member to start, stop, or check the status of th Minecraft server without requiring the need of a member to host the server on their local pc. Combining Discord API with AWS SDK calls, the bot automates cloud resource management in a user-friendly way.
+Node.js + TypeScript Discord bot that exposes slash commands to control the Minecraft server.
 
-### How It Works
+| Command | Description |
+|---------|-------------|
+| `/start` | Starts the EC2 instance, waits for running state, returns public IP, enables idle check rule |
+| `/stop` | Disables idle check rule, stops EC2 instance |
+| `/status` | Returns the current EC2 instance state |
+| `/help` | Lists available commands |
 
-- A Discord slash command is issued(/start, /stop, /status).
-- The bot receives the command with the API and validates it.
-- `/start`:
-  - Starts the Server.
-  - Enables the EventBridge idle check rule.
-  - Since the instance uses a **public IP**, each start will result in an new IP address.
-  -  (Optional) You can associate an **Elastic IP** for a permanent address, but note that Elastic IPs may incur additional AWS costs if left unattached.
-- `/stop`:
-  - Disables the rule.
-  - Saves the world file.
-  - Stops the EC2 instance.
-- `/status`:
-  - Checks the status of the EC2 instance.
+**Stack:** discord.js v14, AWS SDK v3 (EC2 + EventBridge Scheduler), TypeScript, Docker
 
-### Deployment Instructions 
+**Deployment:** Docker container on a Raspberry Pi 4 (ARM-compatible image)
 
-1. **Prepare the Environment**
-    - Ensure you have Node.js v18 or higher installed (compatible w/ Discord.js v14)
+#### Required Environment Variables
 
-2. **Install Dependencies**
+```env
+DISCORD_TOKEN=your-discord-bot-token
+CLIENT_ID=your-discord-application-id
+EC2_INSTANCE_ID=i-xxxxxxxxxxxxxxxxx
+EVENTBRIDGE_RULE_NAME=mc-idle-check
+AWS_REGION=us-east-1
+```
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+See [discord_bot/.env.example](discord_bot/.env.example).
 
-3. **Configure Environment**
-    - Create a `.env` file or update the configuration file with your Discord bot token and any required settings.
-    
-    #### Required Environment Variables:
-    - `DISCORD_TOKEN`: Bot token from the Discord Developer Portal.
-    - `DISCORD_CLIENT_ID`: Client/application ID.
-    - `AWS_REGION`: AWS region of your infrastructure (e.g., us-east-2).
-    - `INSTANCE_ID`: EC2 instance ID for the Minecraft server.
-    - `RULE_NAME`: EventBridge rule name tied to idle checking.
+---
 
-4. **Apply Least Privilege Principle**
-    - Please apply the least privilege principle w/ IAM roles and users in AWS (I had created a user for the bot to use as it was inside the pi desktop).
+### `idle_check/`
 
-5. **Run the Bot**
-    - locally (for testing):
+Python AWS Lambda function that runs on a schedule (via EventBridge Scheduler) to monitor player activity and auto-stop the server when idle.
 
-    ```bash
-    python bot.py
-    ```
-    - As a Service (prod):
-      - Docker or similar
-      - Raspberry Pi
+**Logic:**
+- Queries player count from the Minecraft server using `mcstatus`
+- If 0 players are online: sends `save-all` + `stop` via SSM, disables the EventBridge rule, stops the EC2 instance, and notifies Discord via webhook
+- Runs every 2 minutes while the server is active
 
-### Requirements for discord_bot.py
+**Stack:** Python 3.13, boto3, mcstatus, requests
 
-- Node.js v18+
-- discord.js v14+
-- AWS SDK for Node.js (v3 recommended)
-- A registered Discord application with bot token and slash command  
+#### Required Environment Variables (Lambda)
 
-### Notes
+```
+INSTANCE_ID=i-xxxxxxxxxxxxxxxxx
+EVENTBRIDGE_RULE_NAME=mc-idle-check
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+AWS_REGION=us-east-1
+```
 
-- Ensure your bot token is kept secure and never shared publicly.
-- Refer to the documentation for troubleshooting and advanced configuration.
-- For support or feature requests, open an issue on the repository.
-- Will add more in the futures that will benefit my discord server and user-friendly+ 
+---
 
-### Future added features goals:
+### `terraform/`
 
-- Add Elastic IP address to the EC2 instance for a permanent address.
-- More slash commands that will use AWS SSM to save, reset, debug the MC server.
-- Limit permissions for the server so only certain members can send discord commands.
+Terraform IaC that provisions all AWS resources:
 
-## Documentation for idle_check
+- **Lambda function** (`minecraftLambda`) — Python 3.13, auto-zips with dependencies
+- **EC2 instance** — t4g.large, Amazon Linux 2023 ARM64, latest AMI fetched dynamically
+- **Security Group** — ports 25565 (Minecraft) and 22 (SSH)
+- **EventBridge Scheduler** — `rate(2 minutes)`, targets Lambda
+- **Lambda permission** — allows EventBridge Scheduler to invoke Lambda
+- Fetches pre-existing IAM roles and SSM instance profile via `data` sources
 
-### Purpose
+See [docs/terraform-iac-reference.md](docs/terraform-iac-reference.md) for a full walkthrough.
 
-This project runs as a backend service on AWS Lambda, providing serverless execution of Python code for scalable and cost-efficient automation. It integrates with Discord slash commands to manage a Minecraft server hosted on an EC2 instance via EventBridge.
+**Setup:**
 
-The main purpose is to reduce unnecessary server runtime by automatically stopping the instance when no players are online (after 30 minutes of inactivity). Any member of the Discord server can easily start or stop the Minecraft server without relying on a local PC.
+```bash
+cd terraform/
+cp terraform.tfvars.example terraform.tfvars
+# fill in terraform.tfvars with your Discord webhook URL
+terraform init
+terraform plan
+terraform apply
+```
 
-### How It Works
+---
 
-- A Discord slash command triggers an API request that starts the EventBridge rule and the EC2 instance hosting the Minecraft server.
+### `scripts/setup.sh`
 
-- The AWS Lambda function `idle_check` runs on a schedule to monitor server activity.
+EC2 user data script that runs on first boot:
 
-- If no players have been online for 30 minutes, the Lambda function issues commands to save progress and stop the EC2 instance.
+- Installs Java 21 (Amazon Corretto)
+- Downloads and installs Minecraft Forge
+- Creates a `minecraft` user and server directory at `/opt/minecraft/server`
+- Generates `start` / `stop` scripts
+- Registers a `minecraft.service` systemd unit for auto-restart on reboot
 
-- This ensures the server only runs when needed, saving costs while letting any Discord member start or stop it without using a local machine.
-
-### Deployment Instructions
-
-1. **Prepare the Environment**
-    - Ensure you have **Python 3.10** or higher installed (compatible with AWS Lambda).
-
-    - Install all required packages listed in `requirements.txt` using:
-
-      ```
-      pip install -r requirements.txt -t ./package
-      ```
-    - Move your source code into the `package` directory.
-
-2. **Create the Deployment Package**
-
-    - Zip the contents of the `package` directory (not the directory itself):
-
-      ```
-      cd package
-      zip -r ../lambda_function.zip .
-      ```
-    - The resulting `lambda_function.zip` file is ready for upload to AWS Lambda.
-
-3. **AWS Lambda Environment Requirements**
-    - Runtime: **Python 3.10** or higher (choose based on your code compatibility).
-    - Memory: Configure according to workload (default is 128 MB).
-    - Timeout: Set an appropriate timeout the function (e.g., 45 sec)
-    - Environment Variables: Define any required variables in the Lambda Configuration.
-
-      - `INSTANCE_ID`: EC2 instance id
-      - `RULE_NAME`: EventBridge rule name
-      - `AWS_REGION`: AWS region where the services are at, ex: us-east-2 
-      - `DISCORD_WEBHOOK_URL`: webhook url from Discord bot which will send a message in the sever
-
-4. **AWS EventBridge Requirements**
-    - Rule Type: Scheduled
-
-      - For this project, EventBridge rule is triggered by a Discord slash command.
-
-    - Target: AWS Lambda function that manages the EC2 server start/stop.
-
-    - Permissions: 
-    
-      - EventBridge needs permission to invoke your Lambda Function.
-
-      - Ensure the Lambda execution role allows `lambda:InvokeFunction`.
-    - Rule Name: Set a descriptive name, eg., `start-mc-server-rule`.
-    - [**Important**] Region: Must match the region of your Lambda and EC2 instance, else will need to create a VPC rule to configure. 
-
-5. **Apply Least Privilege Principle**
-    - Please apply the least privilege principle w/ IAM roles and users in AWS (I had created a user for the bot to use as it was inside the pi desktop).
-
-6. **Testing Locally**
-    - You can use tools like [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli.html) or [localstack](https://github.com/localstack/localstack) to test your Lambda function locally before deployment.
-
-### Requirements for idle_check
-
-- All Python dependencies must be listed in `requirements.txt`.
-- The Lambda handler must be defined (e.g., `lambda_function.lambda_handler`).
-- Ensure compatibility with the AWS Lambda Python runtime.
-
-### Notes
-
-- Do not include unnecessary files (such as tests or documentation) in the deployment zip.
-
-- If your code uses **native dependencies**, ensure they are compiled for the Lambda environment (Amazon Linux).
-
-- Might be outdated since there was some mixup between the code here and in the Lambda...
-
-
+---
 
 ## Challenges & Learnings
 
-1. **Docker on Raspberry Pi** 
+1. **Docker on Raspberry Pi** — Running the bot on an ARM device caused AWS credential issues. I created a dedicated IAM user with least-privilege permissions, stored credentials in `.env`, and got the bot working end-to-end.
 
-   Running the bot container on an ARM-based device caused compatibility issues. Although the container stayed active, slash command requests didn’t go through at first. After debugging, I realized the Raspberry Pi needed its own AWS credentials. I created a dedicated IAM user, stored credentials securely in an .env file, and got the bot working end-to-end. 
+2. **EventBridge Scheduler** — First time using the new Scheduler API (not legacy CloudWatch Events). Race conditions between EC2 starting and the rule enabling required careful ordering of start/stop workflows. IAM trust policy `Condition` blocks also silently blocked invocations until I understood the issue.
 
-2. **EventBridge**
-
-    This was my first time using EventBridge to connect a Discord bot with a Lambda function. While I was able to create a rule that stopped idle servers after a set time, integrating it with the bot caused issues: the rule sometimes triggered incorrectly or fired before the EC2 instance had fully started. I solved this by refining the event logic and adding proper ordering between start/stop workflows.
-
-3. **AWS SDK & Debugging**
-
-    - Learning the AWS SDKs for both Node.js and Python required digging into the official docs to understand their structure.
-
-    - Debugging Lambda meant relying on CloudWatch logs to fine-tune event patterns and limits. 
-
-    - Minecraft status library required a fixed IP, but since I avoided attaching an Elastic IP to save costs, I used AWS SSM to dynamically fetch the instance’s public IP address. 
+3. **AWS SDK & Debugging** — Learning both the Node.js and Python AWS SDKs from scratch. CloudWatch logs were essential for tuning Lambda behavior. Used SSM to dynamically fetch the instance's public IP since I skipped Elastic IP to save costs.
 
 ## Tech Stack
- - Application: Node.js + TypeScript, Python
- - Infra: AWS Lambda, EC2, EventBridge, IAM, SSM
- - Deployment: Docker, Raspberry Pi 4 
 
- ## License
+| Layer | Technology |
+|-------|-----------|
+| Bot | Node.js, TypeScript, discord.js v14 |
+| Serverless | Python 3.13, AWS Lambda, EventBridge Scheduler |
+| Infrastructure | AWS EC2 (t4g.large), SSM, IAM, Security Groups |
+| IaC | Terraform |
+| Deployment | Docker, Raspberry Pi 4 |
+
+## Future Goals
+
+- Add Elastic IP for a permanent server address
+- More slash commands using SSM (save, reset, debug MC server)
+- Role-based Discord permissions so only certain members can control the server
+
+## License
 
 This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
