@@ -1,5 +1,5 @@
 # ARM-friendly Node image
-FROM node:18-bullseye
+FROM node:22-bullseye-slim
 
 WORKDIR /app
 
