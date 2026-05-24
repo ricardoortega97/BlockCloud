@@ -1,55 +1,23 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.pyc
-
-# Virtual environments
-env/
-venv/
-ENV/
-.venv/
-.env/
-
-# pip
-pip-log.txt
-pip-delete-this-directory.txt
-
-# macOS
-.DS_Store
-
-# VS Code, PyCharm
-.vscode/
-.idea/
-
-# Test, coverage, and build artifacts
-*.log
-*.pot
-*.mo
-*.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.tox/
-dist/
-build/
-.eggs/
-*.egg-info/
-*.egg
-
-# Jupyter Notebook
-.ipynb_checkpoints/
-
-# Local config
-*.env
-.env.*
-
-# Ignore zip files
-*.zip
-
-/discord_bot
+# Bundled pip dependencies (installed by Terraform's null_resource)
+idle_check/boto3*/
+idle_check/botocore*/
+idle_check/s3transfer*/
+idle_check/mcstatus*/
+idle_check/requests*/
+idle_check/certifi*/
+idle_check/charset_normalizer*/
+idle_check/idna*/
+idle_check/urllib3*/
+idle_check/dnspython*/
+idle_check/asyncio_dgram*/
+idle_check/jmespath*/
+idle_check/dateutil*/
+idle_check/six*
+idle_check/bin/
+idle_check/*.dist-info/
+idle_check/*.so
+idle_check/awscrt-stubs/
+idle_check/types_awscrt*/
+idle_check/dns/
+idle_check/build/
+idle_check/idle_check/__pycache__

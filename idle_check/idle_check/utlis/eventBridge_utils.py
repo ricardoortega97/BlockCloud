@@ -1,17 +1,22 @@
 import boto3
 
 class EventBridgeManager:
-    """
-    Class to disable an EventBridge rule when the EC2 instance is stopped in the idle check process.
-    """
     def __init__(self, rule_name: str, region_name: str):
         self.rule_name = rule_name
-        self.event = boto3.client('events', region_name=region_name)
+        self.scheduler = boto3.client('scheduler', region_name=region_name)
 
     def disable_rule(self):
-        """
-        Disables the EventBridge rule specified by rule_name.
-        :return: A message indicating the rule has been disabled.
-        """
-        self.event.disable_rule(Name=self.rule_name)
-        return f"Rule {self.rule_name} has been disabled."
+        # Fetch current schedule config to preserve all required fields on update
+        schedule = self.scheduler.get_schedule(
+            Name=self.rule_name,
+            GroupName='default'
+        )
+        self.scheduler.update_schedule(
+            Name=self.rule_name,
+            GroupName='default',
+            ScheduleExpression=schedule['ScheduleExpression'],
+            FlexibleTimeWindow=schedule['FlexibleTimeWindow'],
+            Target=schedule['Target'],
+            State='DISABLED'
+        )
+        return f"Schedule {self.rule_name} has been disabled."
